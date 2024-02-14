@@ -1,1 +1,42 @@
-Upload of documentation comming soon...
+# NotJeket: A Pentesting Project Overview
+
+## Introduction
+NotJeket is a comprehensive pentesting project focusing on the security analysis of multiple virtual machines (VMs), including a diverse range of Windows environments and a Debian 12 VM configured as a router. This document outlines the project's setup, configuration, and execution, emphasizing practical pentesting approaches and tools.
+
+## Project Configuration
+
+### Pre-Planning and VirtualBox Setup
+- **Objective**: Ensure VMs can communicate within a private network, isolated from external networks.
+- **Implementation**: Utilization of a NAT-Network in VirtualBox, enabling DHCP for automatic IP address assignment.
+
+### Debian 12 VM Router Configuration
+- **Network Adapters**: Two adapters configured; a bridged adapter for internet access and a NAT-Network adapter for internal network communication.
+- **Network Topology**: Adopted a STAR network topology to route all traffic through the Debian VM, acting as a router.
+
+### Debian Router Setup Steps
+1. **Enable IP Forwarding**: Modified `sysctl.conf` to allow IP forwarding.
+2. **Network Adapter Identification**: Used `ip addr show` to identify and configure network adapters.
+3. **Traffic Masquerading**: Installed `iptables` and added rules to masquerade traffic between adapters.
+
+### Windows VM Settings
+- **Configuration**: Enabled network sharing, installed antivirus, and activated various protocols and services to mimic an end-user environment.
+- **Software Installation**: Deployed common applications and utilities to replicate a typical user's setup.
+
+## Pentesting VM Configuration
+- **Selection**: Chose Parrot OS for the pentesting VM, emphasizing on updating the system before proceeding with pentesting activities.
+
+## Pentesting Phases
+
+### Information Gathering
+- **Tool Used**: `nmap` for network scanning and identifying open ports and services on the target VMs.
+
+### Vulnerability Assessment
+- **Tools**: MetaSploit and ExploitDB for identifying and exploiting vulnerabilities.
+- **Process**: Setting target hosts (`RHOSTS`) and searching for available exploits based on the OS version and services identified.
+
+### Exploit Execution
+- **Windows 8.1 VM**: Demonstrated with a proof of concept using the MS15-100 vulnerability.
+- **Windows 10 and Windows 11 VMs**: Illustrated different exploit strategies, including browser-based exploits and privilege escalation techniques.
+
+## Conclusion
+The project NotJeket provides a deep dive into practical pentesting against a controlled environment of Windows and Debian VMs. It highlights the critical steps for setting up a pentesting lab, conducting information gathering, vulnerability assessment, and executing exploits to understand the security posture of the target systems.
